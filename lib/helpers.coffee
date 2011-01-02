@@ -68,7 +68,7 @@ exports.buildSqlUpdate = (table, data)->
 
 # build a SQL count(*) statement for the given table and conditions
 exports.execSqlCount = (client, table, query, callback) ->
-  conditions  _.map(query.conditions, field_value_mapper).join(' AND ')
+  conditions = _.map(query.conditions, field_value_mapper).join(' AND ')
   query = "SELECT COUNT(*) FROM " + table + " WHERE " + conditions
   client.query(query, (err, rs) ->
     rowCnt = 0

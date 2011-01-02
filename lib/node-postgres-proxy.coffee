@@ -184,7 +184,7 @@ ProxyServer.prototype.handleSQLquery = (self, client, resp, query) ->
 # the connection pool or create a new connection if none was found
 ProxyServer.prototype.databaseConnection = (dbName, callback) ->
     # do we have a configuration for this database?
-    if !(dbName in this.config['databases'])
+    if not (dbName of this.config['databases'])
         callback({status: 404, message: 'configuration for database "' + dbName + '" does not exist'})
     else
         # get a database connection from the pool and execute the query
