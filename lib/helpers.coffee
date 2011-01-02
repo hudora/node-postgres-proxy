@@ -1,3 +1,6 @@
+# some generic helper functions for the PostgreSQL proxy
+# (c) 2010, 2011 Axel Schlueter, Maximillian Dornseif for HUDORA
+
 sys = require("sys") 
 _ = require(__dirname + "/../lib/underscore/underscore.js")
 
