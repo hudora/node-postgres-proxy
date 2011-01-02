@@ -72,8 +72,8 @@ ProxyServer.prototype.hasValidCredentials = (req, resp) ->
     digest = req.headers['x-sig']
     secrets = this.config.secrets
     if digest && secrets
-        for i in secrets
-            hmac = crypto.createHmac('sha1', secrets[i])
+        for secret in secrets
+            hmac = crypto.createHmac('sha1', secret)
             hmac.update(req.url)
             if digest == hmac.digest(encoding='hex')
               return true
@@ -161,7 +161,7 @@ ProxyServer.prototype.handleJSONquery = (self, client, resp, clientData) ->
                         headers = {'Content-Type': 'application/json; encoding=utf-8'}
                         resp.writeHead(200, _.extend(self.config.responseHeaders || {}, headers))
                         resp.end('{"success": true}')
-                    )
+                  )
             )
 
 
