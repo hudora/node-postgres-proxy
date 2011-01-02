@@ -40,6 +40,7 @@ exports.parseJSON = (data) ->
     try 
         return JSON.parse(data)
     catch error
+        console.log(error)
         return undefined
 
 

@@ -144,15 +144,15 @@ ProxyServer.prototype.handleJSONquery = (self, client, resp, clientData) ->
     if !query || !query.table || !query.data
         h.sendError(resp, 'invalid query JSON found: ' + clientData, 400);
     else
-        for i in query.data
-            h.execSqlCount(client, query.table, query.data[i], (err, rowCnt) ->
+        for row in query.data
+            h.execSqlCount(client, query.table, row, (err, rowCnt) ->
                 if err
                     h.sendError(resp, 'Database Error: ', 500);
                 else
                   if rowCnt > 0 
-                      sql = h.buildSqlUpdate(query.table, query.data[i]);
+                      sql = h.buildSqlUpdate(query.table, row);
                   else
-                      sql = h.buildSqlInsert(query.table, query.data[i]);
+                      sql = h.buildSqlInsert(query.table, row);
                   res = client.query(sql, (err, rs) ->
                         if err
                             client.query('rollback')
