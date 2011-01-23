@@ -21,7 +21,7 @@ upsert_row_counter = 0
 upsert_error_counter = 0
 update_counter = 0
 insert_counter = 0
-
+timing_log = h.createRingBuffer(500)
 
 # create and return a new proxy instance
 exports.createProxy = (configFilenameOrConfiguration, callback) ->
@@ -34,12 +34,12 @@ ProxyServer = (configFilenameOrConfiguration, callback) ->
         this.startServer(callback)
     else
         self = this
-        fs.readFile(configFilenameOrConfiguration, (err, data) ->
+        fs.readFile configFilenameOrConfiguration, (err, data) ->
             if(err)
                 throw err
             self.config = JSON.parse(data)
             self.startServer(callback)
-        )
+
 
 # initialize the HTTP server, then start it
 ProxyServer.prototype.startServer = (callback) ->
@@ -47,17 +47,20 @@ ProxyServer.prototype.startServer = (callback) ->
     port = parseInt(this.config.port || '7070')
     inst = this
 
-    server = http.createServer((req, resp) ->
+    server = http.createServer (req, resp) ->
+        req.__pg_starttime = new Date()
         credentials = inst.config.users || {}
         if url.parse(req.url).pathname == '/stats'
             stats = 
-               'query_counter':        query_counter
-               'query_error_counter':  query_error_counter
-               'upsert_counter':       upsert_counter
-               'upsert_row_counter':   upsert_row_counter
-               'upsert_error_counter': upsert_error_counter
-               'update_counter':       update_counter
-               'insert_counter':       insert_counter
+               'query_counter':             query_counter
+               'query_error_counter':       query_error_counter
+               'upsert_counter':            upsert_counter
+               'upsert_row_counter':        upsert_row_counter
+               'upsert_error_counter':      upsert_error_counter
+               'update_counter':            update_counter
+               'insert_counter':            insert_counter
+               'avg_query_time':            timing_log.avg()
+               'avg_query_time_samplesize': timing_log.len()
             resp.writeHead(200, {'Content-Type': 'application/json'})
             resp.end(JSON.stringify(stats))
         else
@@ -72,10 +75,10 @@ ProxyServer.prototype.startServer = (callback) ->
                       when 'GET'
                         inst.handleGET(req, resp, action, dbName)
                       when 'POST'
-                        inst.handlePOST(req, resp, action, dbName);
+                        inst.handlePOST(req, resp, action, dbName)
                       else
                         h.sendError(resp, 'Method Not Allowed: ' + sys.inspect(req.method), 405)
-    )
+
 
     server.listen(port, host)
     console.log('listening on ' + host + ':' + port)
@@ -126,12 +129,12 @@ ProxyServer.prototype.handleGET = (req, resp, action, dbName) ->
     if clientData == '' || action != 'sql'
        h.sendError(resp, "'sql' Parameter missing on GET request or path does not start with '/sql/'", 400)
     else
-        self.databaseConnection(dbName, (err, client) ->
+        self.databaseConnection dbName, (err, client) ->
             if err
                 h.sendError(resp, 'problem connectiong to the database: ' + sys.inspect(err), 500)
             else
                 self.handleSQLquery(self, client, resp, clientData)
-        )
+
 
 ProxyServer.prototype.handlePOST = (req, resp, action, dbName) ->
     self = this
@@ -140,8 +143,8 @@ ProxyServer.prototype.handlePOST = (req, resp, action, dbName) ->
     req.on('data', (data) -> clientData += data)
     
     # then execute the query on the database
-    req.on('end', -> 
-        self.databaseConnection(dbName, (err, client) ->
+    req.on 'end', -> 
+        self.databaseConnection dbName, (err, client) ->
             if err
                 h.sendError(resp, err.message, err.status)
             else
@@ -155,8 +158,6 @@ ProxyServer.prototype.handlePOST = (req, resp, action, dbName) ->
                       self.handleJSONquery(self, client, resp, clientData)
                     else
                       h.sendError(resp, "invalid action '" + action + "' found", 404)
-        )
-    )
 
 
 # called to handle UPSERT
@@ -164,38 +165,42 @@ ProxyServer.prototype.handleJSONquery = (self, client, resp, clientData) ->
     upsert_counter = upsert_counter + 1
     query = h.parseJSON(clientData)
     if !query || !query.table || !query.data
-        h.sendError(resp, 'invalid query JSON found: ' + clientData, 400);
+        h.sendError(resp, 'invalid query JSON found: ' + clientData, 400)
     else
         for row in query.data
             upsert_row_counter = upsert_row_counter + 1
-            h.execSqlCount(client, query.table, row, (err, rowCnt) ->
+            h.execSqlCount client, query.table, row, (err, rowCnt) ->
                 if err
                     upsert_error_counter = upsert_error_counter + 1
-                    h.sendError(resp, 'Database Error: ', 500);
+                    h.sendError(resp, 'Database Error: ' + err, 500)
                 else
-                  if rowCnt > 0
-                      update_counter =  update_counter + 1
-                      sql = h.buildSqlUpdate(query.table, row);
-                  else
-                      insert_counter = insert_counter + 1
-                      sql = h.buildSqlInsert(query.table, row);
-                  res = client.query(sql, (err, rs) ->
-                        if err
-                            upsert_error_counter = upsert_error_counter + 1
-                            client.query('rollback')
-                            h.sendError(resp, 'Database Error: ' + err.message + ' - SQL: ' + sql, 500)
+                    if rowCnt > 1
+                        upsert_error_counter = upsert_error_counter + 1
+                        h.sendError(resp, 'More than one row would be affected', 400)
+                    else
+                        if rowCnt == 1
+                            update_counter =  update_counter + 1
+                            sql = h.buildSqlUpdate(query.table, row)
                         else
-                        headers = {'Content-Type': 'application/json; encoding=utf-8'}
-                        resp.writeHead(200, _.extend(self.config.responseHeaders || {}, headers))
-                        resp.end('{"success": true}')
-                  )
-            )
+                            insert_counter = insert_counter + 1
+                            sql = h.buildSqlInsert(query.table, row)
+
+                        res = client.query sql, (err, rs) ->
+                            if err
+                                upsert_error_counter = upsert_error_counter + 1
+                                client.query('rollback')
+                                h.sendError(resp, 'Database Error: ' + err.message + ' - SQL: ' + sql, 500)
+                            else
+                            headers = {'Content-Type': 'application/json; encoding=utf-8'}
+                            resp.writeHead(200, _.extend(self.config.responseHeaders || {}, headers))
+                            resp.end('{"success": true}')
+                            timing_log.push((new Date()) - req.__pg_starttime)
 
 
 # called to handle a single query
 ProxyServer.prototype.handleSQLquery = (self, client, resp, query) ->
     query_counter = query_counter + 1
-    client.query(query, (err, rs) ->
+    client.query query, (err, rs) ->
         if err
             query_error_counter = query_error_counter + 1
             client.query('rollback')
@@ -206,7 +211,7 @@ ProxyServer.prototype.handleSQLquery = (self, client, resp, query) ->
             headers = {'Content-Type': 'application/json; encoding=utf-8'}
             resp.writeHead(200, _.extend(self.config.responseHeaders || {}, headers))
             resp.end(JSON.stringify(rs))
-    )
+            timing_log.push((new Date()) - req.__pg_starttime)
 
 
 # get the matching database connection for the request, either from
@@ -219,4 +224,3 @@ ProxyServer.prototype.databaseConnection = (dbName, callback) ->
         # get a database connection from the pool and execute the query
         database = this.config['databases'][dbName]
         pg.connect('pg://' + database, callback)
-

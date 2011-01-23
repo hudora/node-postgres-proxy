@@ -3,7 +3,9 @@ TEST_DATABASE = http://localhost:7070/sql/node
 TEST_JSON = http://localhost:7070/json/node
 CREDENTIALS = "top:secret"
 
-default: lib/helpers.js lib/node-postgres-proxy.js
+default: compile
+
+compile: lib/helpers.js lib/node-postgres-proxy.js
 
 lib/helpers.js: lib/helpers.coffee
 	coffee -c lib/helpers.coffee
@@ -15,11 +17,9 @@ run:
 	node runner.js
 
 dependencies: 
-	git submodule update --init lib/node-postgres
-	git submodule update --init lib/node-elf-logger
-	git submodule update --init lib/underscore
+	git submodule update --init
 
-tests:
+test: compile
 	vows --spec tests.js
 
 test_insert:
