@@ -21,7 +21,7 @@ upsert_row_counter = 0
 upsert_error_counter = 0
 update_counter = 0
 insert_counter = 0
-
+timing_log = h.createRingBuffer(500)
 
 # create and return a new proxy instance
 exports.createProxy = (configFilenameOrConfiguration, callback) ->
@@ -48,16 +48,19 @@ ProxyServer.prototype.startServer = (callback) ->
     inst = this
 
     server = http.createServer (req, resp) ->
+        req.__pg_starttime = new Date()
         credentials = inst.config.users || {}
         if url.parse(req.url).pathname == '/stats'
             stats = 
-               'query_counter':        query_counter
-               'query_error_counter':  query_error_counter
-               'upsert_counter':       upsert_counter
-               'upsert_row_counter':   upsert_row_counter
-               'upsert_error_counter': upsert_error_counter
-               'update_counter':       update_counter
-               'insert_counter':       insert_counter
+               'query_counter':             query_counter
+               'query_error_counter':       query_error_counter
+               'upsert_counter':            upsert_counter
+               'upsert_row_counter':        upsert_row_counter
+               'upsert_error_counter':      upsert_error_counter
+               'update_counter':            update_counter
+               'insert_counter':            insert_counter
+               'avg_query_time':            timing_log.avg()
+               'avg_query_time_samplesize': timing_log.len()
             resp.writeHead(200, {'Content-Type': 'application/json'})
             resp.end(JSON.stringify(stats))
         else
@@ -191,6 +194,7 @@ ProxyServer.prototype.handleJSONquery = (self, client, resp, clientData) ->
                             headers = {'Content-Type': 'application/json; encoding=utf-8'}
                             resp.writeHead(200, _.extend(self.config.responseHeaders || {}, headers))
                             resp.end('{"success": true}')
+                            timing_log.push((new Date()) - req.__pg_starttime)
 
 
 # called to handle a single query
@@ -207,6 +211,7 @@ ProxyServer.prototype.handleSQLquery = (self, client, resp, query) ->
             headers = {'Content-Type': 'application/json; encoding=utf-8'}
             resp.writeHead(200, _.extend(self.config.responseHeaders || {}, headers))
             resp.end(JSON.stringify(rs))
+            timing_log.push((new Date()) - req.__pg_starttime)
 
 
 # get the matching database connection for the request, either from

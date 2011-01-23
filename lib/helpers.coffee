@@ -5,6 +5,35 @@ sys = require("sys")
 _ = require(__dirname + "/../lib/underscore/underscore.js")
 
 
+exports.createRingBuffer = (length) ->
+    pointer = 0
+    buffer = []
+    ret =
+        push: (item) ->
+            buffer[pointer] = item
+            pointer = (length + pointer + 1) % length
+        get: () -> 
+            return buffer
+        len: () -> 
+            elements = 0
+            for val in buffer
+                if val != undefined
+                    elements += 1
+            return elements
+        avg: () ->
+            sum = 0.0
+            elements = 0.0
+            for val in buffer
+                if val != undefined
+                    sum += val
+                    elements += 1
+            if elements < 1
+                return sum
+            else
+                return sum / elements
+    return ret
+
+
 exports.decodeBase64Authorization = (authheader) ->
     if !authheader
         return null
