@@ -169,23 +169,28 @@ ProxyServer.prototype.handleJSONquery = (self, client, resp, clientData) ->
             h.execSqlCount client, query.table, row, (err, rowCnt) ->
                 if err
                     upsert_error_counter = upsert_error_counter + 1
-                    h.sendError(resp, 'Database Error: ', 500)
+                    h.sendError(resp, 'Database Error: ' + err, 500)
                 else
-                  if rowCnt > 0
-                      update_counter =  update_counter + 1
-                      sql = h.buildSqlUpdate(query.table, row)
-                  else
-                      insert_counter = insert_counter + 1
-                      sql = h.buildSqlInsert(query.table, row)
-                  res = client.query sql, (err, rs) ->
-                        if err
-                            upsert_error_counter = upsert_error_counter + 1
-                            client.query('rollback')
-                            h.sendError(resp, 'Database Error: ' + err.message + ' - SQL: ' + sql, 500)
+                    if rowCnt > 1
+                        upsert_error_counter = upsert_error_counter + 1
+                        h.sendError(resp, 'More than one row would be affected', 400)
+                    else
+                        if rowCnt == 1
+                            update_counter =  update_counter + 1
+                            sql = h.buildSqlUpdate(query.table, row)
                         else
-                        headers = {'Content-Type': 'application/json; encoding=utf-8'}
-                        resp.writeHead(200, _.extend(self.config.responseHeaders || {}, headers))
-                        resp.end('{"success": true}')
+                            insert_counter = insert_counter + 1
+                            sql = h.buildSqlInsert(query.table, row)
+
+                        res = client.query sql, (err, rs) ->
+                            if err
+                                upsert_error_counter = upsert_error_counter + 1
+                                client.query('rollback')
+                                h.sendError(resp, 'Database Error: ' + err.message + ' - SQL: ' + sql, 500)
+                            else
+                            headers = {'Content-Type': 'application/json; encoding=utf-8'}
+                            resp.writeHead(200, _.extend(self.config.responseHeaders || {}, headers))
+                            resp.end('{"success": true}')
 
 
 # called to handle a single query
