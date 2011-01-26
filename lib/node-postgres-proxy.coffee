@@ -144,12 +144,12 @@ ProxyServer.prototype.handlePOST = (req, resp, action, dbName) ->
     
     # then execute the query on the database
     req.on 'end', -> 
-        # To attacks, a query parameter is added for every POST request:
+        # To avoid attacks, a query parameter is added for every POST request:
         # a sha1 hashed value of the content
         query = url.parse(req.url, true).query
         hash = crypto.createHash("sha1")
         hash.update(clientData)
-        if hash.digest(hex) != query.hash
+        if hash.digest(hex) != query['xsig']
             h.sendError(resp, 'Invalid hash', 400)
             return
     
