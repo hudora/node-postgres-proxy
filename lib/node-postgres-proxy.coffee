@@ -83,7 +83,7 @@ ProxyServer.prototype.startServer = (callback) ->
 
     server.listen(port, host)
     console.log('listening on ' + host + ':' + port)
-    elf.createLogger(server, {})
+    elf.createLogger(server, {'stream': process.stdout})
     if callback
       callback(server)
 
