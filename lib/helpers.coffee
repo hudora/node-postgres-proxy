@@ -99,12 +99,12 @@ exports.buildSqlUpdate = (table, data)->
 # build a SQL count(*) statement for the given table and conditions
 exports.execSqlCount = (client, table, query, callback) ->
   conditions = _.map(query.conditions, field_value_mapper).join(' AND ')
-  query = "SELECT COUNT(*) FROM " + table + " WHERE " + conditions
-  client.query(query, (err, rs) ->
+  sql = "SELECT COUNT(*) FROM " + table + " WHERE " + conditions
+  client.query(sql, (err, rs) ->
     rowCnt = 0
     if !err
       rowCnt = rs.rows[0].count
-    callback(err, rowCnt)
+    callback(err, query, rowCnt)
   )
 
 

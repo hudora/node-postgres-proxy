@@ -14,9 +14,9 @@ Installation and configuration
   `Server`-header or `Cache-Control` to modify the caching behaviour of proxy clients.
   Currently it is not possible to configure dynamic headers, e.g. a timestamp or a value
   based on the incoming request.
-* The original Sourcecode is written in [CoofeeScript 1.0][1]. Install it and run 
-  `make default` to recompile the CoffeeScript into JAvascritp. This step is only needed,
-  if you want to change the source.
+* the original sourcecode is written in [CoffeeScript 1.0][1]. Install it and run 
+  `make default` to recompile the CoffeeScript into Javascript. You only need to do this
+  if you've modified the CoffeeScript source.
 
 [1]: http://jashkenas.github.com/coffee-script/
   
@@ -55,7 +55,7 @@ part of the path can either be `sql` or `upsert`, depending on the query format.
 
 To execute a `sql` action query send SQL command via a GET request to the proxy:
 
-    curl -u "top:secret" -G -data-urlencode "sql=SELECT COUNT(*) FROM persons" \
+    curl -u "top:secret" -G --data-urlencode "sql=SELECT COUNT(*) FROM persons" \
         http://localhost:7070/sql/node
     {'success': true,
      'rows': [ {'id': 1, 'name': 'Pierre Niemans'},
@@ -80,6 +80,10 @@ conditions exists and update it. If it doesn't exist an insert SQL query will be
                                     "values": {"name": "Rémy Caillois", "age": 20}}]}'
          http://localhost:7070/json/node
     {'success': true}
+
+Be advised that all records within a single request are NOT checked of uniqueness against each other.
+If a request contains multiple rows sharing a condition you will have to use different UPSERT queries for
+theses rows.
 
 All Request return the result as a JSON-formatted message. If the query was successful the field `success`
 will contain the boolean value `true`. In case of an error `success` will be `false` and the field `error`

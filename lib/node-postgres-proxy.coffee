@@ -5,6 +5,7 @@ sys = require('sys')
 fs = require('fs')
 http = require('http')
 url = require('url')
+util = require('util')
 crypto = require('crypto')
 require.paths.unshift(__dirname + '/../lib/node-elf-logger/lib/')
 elf = require("elf-logger")
@@ -48,7 +49,7 @@ ProxyServer.prototype.startServer = (callback) ->
     inst = this
 
     server = http.createServer (req, resp) ->
-        req.__pg_starttime = new Date()
+        resp.__pg_starttime = new Date()
         credentials = inst.config.users || {}
         if url.parse(req.url).pathname == '/stats'
             stats = 
@@ -82,7 +83,7 @@ ProxyServer.prototype.startServer = (callback) ->
 
     server.listen(port, host)
     console.log('listening on ' + host + ':' + port)
-    elf.createLogger(server, {'stream': process.stdout})
+    elf.createLogger(server, {})
     if callback
       callback(server)
 
@@ -116,7 +117,6 @@ ProxyServer.prototype.hasValidCredentials = (req, resp) ->
     
     # yes, everything's fine, let's move on
     return true
-
 
 # called to handle a single HTTP request
 ProxyServer.prototype.handleGET = (req, resp, action, dbName) ->
@@ -169,7 +169,7 @@ ProxyServer.prototype.handleJSONquery = (self, client, resp, clientData) ->
     else
         for row in query.data
             upsert_row_counter = upsert_row_counter + 1
-            h.execSqlCount client, query.table, row, (err, rowCnt) ->
+            h.execSqlCount client, query.table, row, (err, row, rowCnt) ->
                 if err
                     upsert_error_counter = upsert_error_counter + 1
                     h.sendError(resp, 'Database Error: ' + err, 500)
@@ -194,7 +194,7 @@ ProxyServer.prototype.handleJSONquery = (self, client, resp, clientData) ->
                             headers = {'Content-Type': 'application/json; encoding=utf-8'}
                             resp.writeHead(200, _.extend(self.config.responseHeaders || {}, headers))
                             resp.end('{"success": true}')
-                            timing_log.push((new Date()) - req.__pg_starttime)
+                            timing_log.push((new Date()) - resp.__pg_starttime)
 
 
 # called to handle a single query
@@ -211,7 +211,7 @@ ProxyServer.prototype.handleSQLquery = (self, client, resp, query) ->
             headers = {'Content-Type': 'application/json; encoding=utf-8'}
             resp.writeHead(200, _.extend(self.config.responseHeaders || {}, headers))
             resp.end(JSON.stringify(rs))
-            timing_log.push((new Date()) - req.__pg_starttime)
+            timing_log.push((new Date()) - resp.__pg_starttime)
 
 
 # get the matching database connection for the request, either from
