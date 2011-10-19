@@ -111,11 +111,13 @@ exports.execSqlCount = (client, table, query, callback) ->
 # JS wert in SQL repruasentation wandeln
 SQLstringify = (value) ->
   switch typeof value
-    when 'string' then return "'" + value.replace("'", "''") + "'"
+    when 'string' then return "'" + value.replace(/'/g, "''") + "'"
     when 'number', 'boolean', 'null'
       return String(value);
     else
       return String(value);
+
+exports.SQLstringify = SQLstringify
 
 
 # WHERE Klausel bauen

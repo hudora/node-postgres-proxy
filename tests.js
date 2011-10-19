@@ -161,6 +161,18 @@ vows.describe('helper functions').addBatch({
   },
 
   // ---------------------------------------------------------------------------------------------
+  'SQLstringify': {
+      'With a simple String': {
+          topic: helpers.SQLstringify("hello world"),
+          'returns quoted string': function(topic) { assert.equal(topic, "'hello world'"); }
+      },
+      'With a String with quotes': {
+          topic: helpers.SQLstringify('"Rock\'n\'Roll!"'),
+          'returns an escaped string': function(topic) { assert.equal(topic, "'\"Rock''n''Roll!\"'"); }
+      }
+  },
+
+  // ---------------------------------------------------------------------------------------------
   'parseJSON()': {
     'with undefined input': {
       topic: helpers.parseJSON(undefined),
